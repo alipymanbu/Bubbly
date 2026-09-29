@@ -1,176 +1,25 @@
 # Bubbly
 
-_For configuring Certbot with Nginx as quickly and securely as possible._
+本仓库是「Bubbly」的安卓版本获取入口，附使用资料索引。
 
-[![Nginx Config](https://github.com/eustasy/Bubbly/actions/workflows/nginx.yml/badge.svg)](https://github.com/eustasy/Bubbly/actions/workflows/nginx.yml)
-[![Normal (Shell)](https://github.com/eustasy/Bubbly/actions/workflows/sh.yml/badge.svg)](https://github.com/eustasy/Bubbly/actions/workflows/sh.yml)
-[![Deploy _site to GitHub Pages](https://github.com/eustasy/Bubbly/actions/workflows/pages.yml/badge.svg)](https://github.com/eustasy/Bubbly/actions/workflows/pages.yml)
-[![Maintainability](https://qlty.sh/gh/eustasy/projects/Bubbly/maintainability.svg)](https://qlty.sh/gh/eustasy/projects/Bubbly)
+## 安装文件资源（夸克网盘）
 
-If you want an instant A+ score on Qualys [SSL Labs](https://www.ssllabs.com/ssltest/analyze.html?d=ssl.eustasy.org&hideResults=on), and an A score on [Security Headers](https://securityheaders.com/?q=https%3A%2F%2Fssl.eustasy.org%2F&hide=on), then this is what you'll need to do. You won't need any familiarity with [Certbot](https://github.com/certbot/certbot), [Let's Encrypt](https://letsencrypt.org/), the ACME spec, or SSL in general, just basic Nginx configuration.
+> **Bubbly 安装文件资源（夸克网盘）**：[https://pan.quark.cn/s/8d73bb7b18b0](https://pan.quark.cn/s/8d73bb7b18b0)
 
-## Requirements
+## 官方项目
 
-- **Nginx 1.25.1+** for the `http2` directive,
-- **OpenSSL 3.5+** for the `X25519MLKEM768` post-quantum group.
+- 上游项目：[eustasy/Bubbly](https://github.com/eustasy/Bubbly)
 
-> _Check with `nginx -V`, which reports the OpenSSL Nginx was built against, not the `openssl` on your `$PATH`. Consider deploying on an unsupported release using [Bubbly 2.2.0](https://github.com/eustasy/Bubbly/tree/2.2.0)._
+## 更多资料
 
-| Platform | Nginx | OpenSSL | Supported |
-| --- | --- | --- | --- |
-| Ubuntu 26.04 LTS | 1.28 | 3.5 | Yes |
-| Debian 13 | 1.26 | 3.5 | Yes |
-| Ubuntu 25.10 | 1.28 | 3.5 | Meets both, but end of life |
-| Ubuntu 24.04 LTS | 1.24 | 3.0 | No |
-| Debian 12 | 1.22 | 3.0 | No |
-
-We recommend the use of the distribution's own Nginx, with no third-party repositories.
-
-## Installation
-
-### 1. Install Certbot and Clone Bubbly
-
-We'll start off by cloning the project into the home folder with git.
-
-```bash
-cd &&
-sudo apt install git certbot &&
-git clone https://github.com/eustasy/Bubbly
-```
-
-### 2. Copy config blocks
-
-Copy the configuration into place. Run it again whenever you pull a newer Bubbly.
-
-```bash
-~/Bubbly/bubbly_copy-configs.sh
-```
-
-This installs `conf.d/bubbly_ssl.conf`, which Nginx loads by itself: the shared TLS session cache. Protocols, key exchange groups and ciphers live in `directive/bubbly_ssl-profile.conf` instead, because Nginx takes those from the default server for the socket whatever a site file asks for — hence the next step.
-
-### 3. Enable the default server
-
-Once per server, before any site. It answers whatever no site claims: an unknown `Host`, a connection with no SNI, a probe at your IP address.
-
-```bash
-sudo rm -f /etc/nginx/sites-enabled/default
-sudo ln -s /etc/nginx/sites-available/bubbly_default.conf /etc/nginx/sites-enabled/bubbly_default.conf
-sudo nginx -t && sudo service nginx reload
-```
-
-The `rm` drops the distribution's default site, which also claims `default_server`; with two, Nginx refuses to start.
-
-This matters more than it looks. The default server sets the TLS protocol list and key exchange groups for **every** site on the machine, so without one of your own the role falls to whichever `sites-enabled/` file sorts first — and a new site sorting earlier would change them underneath you. Site files include the same profile as a safety net.
-
-### 4. Configure & Enable Verification
-
-Copy the verification template and replace `example.com` with your domain.
-
-```bash
-sudo cp /etc/nginx/sites-available/bubbly_http.conf /etc/nginx/sites-available/example.com_http.conf
-sudo nano /etc/nginx/sites-available/example.com_http.conf
-```
-
-Use `Ctrl` and `\` to initiate a search and replace for `example.com` with your domain.
-
-```bash
-sudo ln -s /etc/nginx/sites-available/example.com_http.conf /etc/nginx/sites-enabled/example.com_http.conf
-sudo nginx -t && sudo service nginx reload
-```
-
-Or, to keep an existing site running while you migrate, add `include location/bubbly_well-known-passthrough.conf;` to it instead.
-
-### 5. Fetch Certificates
-
-```bash
-~/Bubbly/bubbly_renew-ssl.sh -d example.com -d www.example.com
-```
-
-It will ask for the root password and an email address, and takes a few seconds.
-
-Certbot installs a systemd timer that runs `certbot renew` twice a day, and the `--deploy-hook` recorded in `/etc/letsencrypt/renewal/example.com.conf` reloads Nginx after each success. No cron job needed.
-
-Renewal being automatic is why this script always passes `--force-renew`: running it by hand means you want a certificate now. Don't loop it — [Let's Encrypt allows 5 certificates per identical set of names every 7 days](https://letsencrypt.org/docs/rate-limits/), refilling one every 34 hours, and that limit cannot be raised. Add `--dry-run` to rehearse against staging.
-
-### 6. Start using the Certificates
-
-Copy the live template alongside the verification one. Review its `[OPTION]`s more carefully — the certificate paths have to match the domain you requested — and the `[OPTION]`s and `[WARNING]`s in the files it includes.
-
-```bash
-sudo cp /etc/nginx/sites-available/bubbly_https.conf /etc/nginx/sites-available/example.com_https.conf
-sudo nano /etc/nginx/sites-available/example.com_https.conf
-```
-
-Use `Ctrl` and `\` to initiate a search and replace for `example.com` with your domain.
-
-```bash
-sudo ln -s /etc/nginx/sites-available/example.com_https.conf /etc/nginx/sites-enabled/example.com_https.conf
-sudo nginx -t && sudo service nginx reload
-```
-
-Keep `example.com_http.conf` symlinked permanently. It serves all HTTP traffic, ACME challenges included, so renewals keep working even after a certificate has expired.
-
-### Optional: shared session ticket keys
-
-Nginx 1.23.2+ generates and rotates ticket keys itself, in the shared session cache. You only need your own if **several Nginx instances behind a load balancer** have to resume each other's tickets.
-
-```bash
-~/Bubbly/bubbly_generate-tickets.sh
-```
-
-Then uncomment `ssl_session_ticket_key` in `/etc/nginx/conf.d/bubbly_ssl.conf` and reload. Run it again to rotate: the current key moves to `ticket.old.key` and a fresh one is written, so issued tickets keep working. Nginx encrypts with the first key listed and decrypts with any of them, so keep the newest on top. Both are written `600`, since the key decrypts captured sessions.
-
-Either way, every site shares one session cache — and on 1.23.2+ the automatic keys live in it — so a session begun on one site can be resumed against another. Fine across sites you own, but one site's TLS settings are therefore not a boundary around it; a site needing one declares its own `ssl_session_cache` zone.
-
-## Configuration
-
-Every knob is marked `[OPTION]` in the configuration files, with `[DEFAULT]` on the active choice and `[WARNING]` where one can bite. Six of the changes below are already sitting commented out at the bottom of your `_https.conf`, under `Optional Includes`, so most of this is uncommenting a line and reloading.
-
-| Want | Advice | Change |
-| --- | --- | --- |
-| Brotli | Recommended | install `libnginx-mod-http-brotli-filter`, then uncomment in `groups/performance-common.conf` |
-| Per-site log files | Recommended with more than one site | uncomment `directive/bubbly_logs.conf`, then edit its paths — unedited it restates the defaults |
-| A Content Security Policy | Recommended, carefully | Option 2 or 3 in `directive/bubbly_security-headers.conf` |
-| Only expected request methods | Optional hardening | uncomment `location/bubbly_methods.conf` |
-| Uploads over 1 MB | Optional | uncomment `directive/bubbly_uploads.conf` — 10M |
-| Custom 404 and 50x pages | Optional | create the pages in the site root, then uncomment `location/bubbly_errors.conf` |
-| PHP that runs longer than 60s | Only if needed | raise `fastcgi_read_timeout` in `location/bubbly_extensionless-php.conf` |
-| A per-site connection cap | Only if needed | uncomment `directive/bubbly_limits_server.conf` |
-| OCSP stapling | Only with a CA that still runs OCSP | uncomment `ssl_trusted_certificate` and `directive/bubbly_ocsp-stapling.conf` in your `_https.conf` |
-| TLS 1.3 only | Only if essential | Option 1 in `directive/bubbly_ssl-profile.conf` — drops pre-2020 clients |
-| HSTS across subdomains | Only if essential | Option 2 in `directive/bubbly_security-headers.conf` |
-
-Nginx caps request bodies at 1 MB, so uploads fail with 413 before reaching PHP until `bubbly_uploads.conf` is included — and PHP's own `upload_max_filesize` and `post_max_size` have to allow them too. Without `bubbly_logs.conf`, the HTTPS block logs to the distribution's shared log and HTTP traffic is not logged at all; `_http.conf` marks the `bubbly_logs_off.conf` line to swap if you want port 80 logged. Error pages come with a trap worth respecting: a missing `404.html` 404s, re-enters `error_page`, and Nginx aborts the loop with a 500. OCSP stapling is off because Let's Encrypt retired OCSP — no responder URL has been issued since 2025-05-07 and the responders were shut down on 2025-08-06 — leaving Nginx to log `"ssl_stapling" ignored, no OCSP responder URL in the certificate` and staple nothing. It is still worth turning on behind a CA that publishes one; `openssl x509 -noout -ocsp_uri -in /etc/letsencrypt/live/example.com/cert.pem` answers that in one line. HSTS and TLS 1.3-only are essential-only because neither walks back easily — the first commits subdomains that may not exist yet to HTTPS for two years, the second refuses anything older than roughly 2020.
-
-### Behind a proxy or CDN
-
-_Essential when Nginx sits behind one; pointless otherwise._
-
-`$binary_remote_addr` is the proxy, so rate limits count your whole audience as one client and every log line records the proxy. Uncomment `directive/bubbly_real-ip.conf` — it is listed in both site templates — or include it from a file in `conf.d/` to cover every site at once, since one missed site leaves its logs and limits wrong.
-
-> _Only trust ranges you control. Naming one you do not own lets anyone in it forge their address._
-
-### Rate limiting
-
-_Optional, and deliberately not enabled by default:_ a safe rate depends on whether you are behind a proxy and whether clients speak HTTP/2, neither of which Bubbly can know.
-
-Uncomment an include inside `location ~ \.php$` — see `location/bubbly_extensionless-php.conf` — so only the requests that cost something are counted, rather than every stylesheet and image alongside them. Zones, rates and sizes live in `conf.d/bubbly_limits.conf`.
-
-### PHP Versions
-
-_Optional; nothing to do unless you want a version other than the one your release ships._
-
-Ubuntu 26.04 LTS ships PHP 8.5, which `conf.d/php_sockets.conf` selects by default. Run `ls /etc/php/` to list the versions installed and `ls /var/run/php/` the sockets that exist.
-
-Multiple PHP versions can be easily installed: `php8.5-fpm` and `php8.4-fpm` each get their own `/etc/php/` tree, systemd unit and socket. Each release only _carries_ one, though — 26.04 has 8.5, 24.04 has 8.3, Debian 13 has 8.4 — so extra versions come from Ondřej Surý:
-
-- Ubuntu 22.04 and 24.04: [`ppa:ondrej/php`](https://launchpad.net/~ondrej/+archive/ubuntu/php)
-- Ubuntu 26.04 and Debian: [packages.sury.org/php](https://packages.sury.org/php/), which the PPA is merging into
-
-Their version strings sort above the distribution's, so `apt` prefers their builds for every PHP package once enabled. To put a site on a given version, uncomment Option 2 in `location/bubbly_extensionless-php.conf` and set `$bubbly_php` in each site file. Give each site its own FPM pool while you are there, so one cannot exhaust the workers or read another's sessions.
+- [下载与安装教程](https://github.com/alipymanbu/Android/blob/master/%E5%AE%98%E7%BD%91%E7%89%88APP%E4%B8%8B%E8%BD%BD/Bubbly/%E4%B8%8B%E8%BD%BD%E4%B8%8E%E5%AE%89%E8%A3%85%E6%95%99%E7%A8%8B.md)
+- [Lovemo账号迁移与绑定码](https://github.com/alipymanbu/Android/blob/master/%E5%AE%98%E7%BD%91%E7%89%88APP%E4%B8%8B%E8%BD%BD/Bubbly/Lovemo%E8%B4%A6%E5%8F%B7%E8%BF%81%E7%A7%BB%E4%B8%8E%E7%BB%91%E5%AE%9A%E7%A0%81.md)
+- [Moly币与收费规则](https://github.com/alipymanbu/Android/blob/master/%E5%AE%98%E7%BD%91%E7%89%88APP%E4%B8%8B%E8%BD%BD/Bubbly/Moly%E5%B8%81%E4%B8%8E%E6%94%B6%E8%B4%B9%E8%A7%84%E5%88%99.md)
+- [创建你的第一个AI角色](https://github.com/alipymanbu/Android/blob/master/%E5%AE%98%E7%BD%91%E7%89%88APP%E4%B8%8B%E8%BD%BD/Bubbly/%E5%88%9B%E5%BB%BA%E4%BD%A0%E7%9A%84%E7%AC%AC%E4%B8%80%E4%B8%AAAI%E8%A7%92%E8%89%B2.md)
+- [常见问题与解决](https://github.com/alipymanbu/Android/blob/master/%E5%AE%98%E7%BD%91%E7%89%88APP%E4%B8%8B%E8%BD%BD/Bubbly/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98%E4%B8%8E%E8%A7%A3%E5%86%B3.md)
+- [聊天玩法与语音功能](https://github.com/alipymanbu/Android/blob/master/%E5%AE%98%E7%BD%91%E7%89%88APP%E4%B8%8B%E8%BD%BD/Bubbly/%E8%81%8A%E5%A4%A9%E7%8E%A9%E6%B3%95%E4%B8%8E%E8%AF%AD%E9%9F%B3%E5%8A%9F%E8%83%BD.md)
+- [全部软件目录](https://github.com/alipymanbu/Android/blob/master/%E5%85%A8%E9%83%A8%E8%BD%AF%E4%BB%B6%E7%9B%AE%E5%BD%95.md)
 
 ---
 
-[![Qualys SSL Labs rating ssl.eustasy.org A+, with 100 for certificate and protocol support and 90 for key exchange and cipher strength](https://raw.githubusercontent.com/eustasy/Bubbly/main/screenshot_ssllabs.png)](https://www.ssllabs.com/ssltest/analyze.html?d=ssl.eustasy.org&hideResults=on)
-
-[![Security Headers rating https://ssl.eustasy.org/ A+, this example having added the opt-in Content-Security-Policy to the shipped defaults](https://raw.githubusercontent.com/eustasy/Bubbly/main/screenshot_securityheaders.png)](https://securityheaders.com/?q=https%3A%2F%2Fssl.eustasy.org%2F&hide=on)
+> 本仓库由上游项目 fork 而来，原始说明见[上游仓库](https://github.com/eustasy/Bubbly)。
